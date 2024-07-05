@@ -1,0 +1,97 @@
+# Игнорировать файлы/папки окружения виртуального окружения
+/.venv/
+/.env/
+
+# Игнорировать общие системные файлы
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Игнорировать временные файлы редакторов/IDE
+*.swp
+*~
+.vscode/
+.idea/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Игнорировать файлы конфигурации
+*.env
+.env.local
+.env.*.local
+
+# Игнорировать логи
+*.log
+
+# Игнорировать файлы и папки, создаваемые при тестировании
+.tox/
+.nox/
+coverage.xml
+.coverage
+*.cover
+htmlcov/
+
+# Игнорировать файлы, создаваемые инструментами сборки
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Игнорировать артефакты документации
+docs/_build/
+
+# Игнорировать артефакты C extensions
+*.so
+
+# Игнорировать файлы в каталоге профилирования
+.prof
+
+# Игнорировать файлы статистики
+*.stats
+*.dat
+
+# Игнорировать файлы Jupyter Notebook
+.ipynb_checkpoints/
+*.ipynb
+
+# Игнорировать файлы mypy
+.mypy_cache/
+
+# Игнорировать файлы pylint
+.pylint.d/
+
+# Игнорировать файлы pipenv
+Pipfile.lock
+
+# Игнорировать файлы pyright
+pyrightconfig.json
+
+# Специфичные для Windows исключения
+# Игнорировать файлы и папки корзины
+$RECYCLE.BIN/
+
+# Игнорировать системные файлы Windows
+*.cab
+*.msi
+*.msm
+*.msp
+
+# Игнорировать логи Windows
+*.LOG
+
+# Игнорировать ошибки Windows
+*.DMP
+
+# Игнорировать сгенерированные файлы конфигурации
+*.config
+*.conf
+
+# Игнорировать системные файлы Windows
+pagefile.sys
+swapfile.sys
+ntuser.dat
+ntuser.dat.LOG1
+ntuser.dat.LOG2
+ntuser.ini
