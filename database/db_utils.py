@@ -44,13 +44,17 @@
 # );
 
 # CREATE TABLE IF NOT EXISTS bot_Users (
-#     id INT AUTO_INCREMENT PRIMARY KEY,
-#     User_id INT NOT NULL,
-#     phone VARCHAR(20) NOT NULL,
-#     name VARCHAR(100),
-#     birth_date DATE,
-#     Active BOOLEAN DEFAULT FALSE,
-#     id_card VARCHAR(50)
+#    id INT AUTO_INCREMENT PRIMARY KEY,
+#    user_id INT NOT NULL,
+#    first_name VARCHAR(255),
+#    last_name VARCHAR(255),
+#    full_name VARCHAR(255),
+#    birthdate DATE,
+#    phone VARCHAR(20) NOT NULL,
+#    user_sul_id INT,
+#    gender VARCHAR(10),
+#    card_id VARCHAR(100),
+#    active BOOLEAN DEFAULT FALSE
 # );
 # -------------------------------------------------------------------------
 
@@ -58,6 +62,7 @@
 import mysql.connector
 
 from log.logging import log
+from datetime import datetime, timezone
 
 # Кэши для шаблонов сообщений и данных пользователей/администраторов
 template_cache = {}
@@ -103,20 +108,21 @@ def get_data_db(data_type, phone=None, user_id=None):
     """
     # Проверка кэша для данных типа 3 (список администраторов)
     if data_type == 3:
-        if data_cache['admin_list'] is not None:
+        if data_cache['admin_list']:
             return data_cache['admin_list']
-    
+
     # Проверка кэша для данных типа 4 (информация о пользователе)
     if data_type == 4:
         if user_id is not None and user_id in data_cache['users']:
             return data_cache['users'][user_id]
         if phone is not None:
             for cached_user in data_cache['users'].values():
-                if cached_user[2] == phone:
+                if cached_user['phone'] == phone:
+                    print("Данные из кеша")
                     return cached_user
 
     connection = connect_to_db()
-    
+
     if connection:
         try:
             with connection.cursor() as cursor:
@@ -133,7 +139,7 @@ def get_data_db(data_type, phone=None, user_id=None):
                     cursor.execute(query)
                     data = cursor.fetchall()
                     if len(data) > 0:
-                        data_cache['admin_list'] = data  # Кэширование списка администраторов
+                        data_cache['admin_list'] = [row[0] for row in data]  # Кэширование списка администраторов
                     else:
                         data_cache['admin_list'] = []  # Или другое значение по умолчанию, если нет данных
                 elif data_type == 4:
@@ -145,8 +151,21 @@ def get_data_db(data_type, phone=None, user_id=None):
                         query = "SELECT * FROM bot_Users WHERE User_id = %s"
                         cursor.execute(query, (user_id,))
                         data = cursor.fetchone()
-                        if data:
-                            data_cache['users'][user_id] = data  # Кэширование данных пользователя
+                    if data:
+                        data_cache['users'][data['User_id']] = {
+                            'user_id': data['User_id'],
+                            'first_name': data['first_name'],
+                            'last_name': data['last_name'],
+                            'full_name': data['full_name'],
+                            'birthdate': data['birthdate'],
+                            'phone': data['phone'],
+                            'user_sul_id': data['user_sul_id'],
+                            'user_sul_gender': data['user_sul_gender'],
+                            'card_id': data['card_id'],
+                            'active': data['active']
+                        }  # Кэширование данных пользователя
+                        print(data_cache)
+                        print(data_cache)
                     else:
                         log("Ошибка при вызове функции get_data_db с параметрами phone или user_id, "
                             "необходимо указать одно из двух значений.")
@@ -154,9 +173,9 @@ def get_data_db(data_type, phone=None, user_id=None):
                 else:
                     log("Ошибка при вызове функции get_data_db передан некорректный тип данных.")
                     return None
-            
+
             return data
-        
+
         except mysql.connector.Error as err:
             log(f"Ошибка при выполнении запроса в get_data_db: {err}")
             return None
@@ -225,6 +244,72 @@ def update_user_db(user_id, phone=None, name=None, birth_date=None, active=None,
 
         except mysql.connector.Error as err:
             log(f"Ошибка при выполнении запроса в update_user_db: {err}")
+
+        finally:
+            connection.close()
+
+    else:
+        log("Невозможно установить соединение с базой данных.")
+
+
+def register_user_db(data):
+    """
+    Регистрирует нового пользователя в базе данных.
+    Параметры:
+    - data: dict - словарь с данными пользователя.
+        user_id = user_id (MySQL)
+        frist_name = frist_name (MySQL)
+        last_name = last_name (MySQL)
+        full_name = full_name (MySQL)
+        birthdate = birthdate (MySQL)
+        phone = phone (MySQL)
+        user_sul_id = user_sul_id (MySQL)
+        user_sul_gender = gender (MySQL)
+        card_id = card_id (MySQL)
+    Возвращает: None.
+    """
+    connection = connect_to_db()
+
+    if connection:
+        try:
+            with connection.cursor() as cursor:
+                birthdate_unix = data['birthdate'] // 1000
+                birthdate = datetime.fromtimestamp(birthdate_unix, tz=timezone.utc).strftime('%d.%m.%Y')
+                insert_query = """
+                INSERT INTO bot_Users (user_id, first_name, last_name, full_name, birthdate, 
+                phone, user_sul_id, gender, card_id, active)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """
+                cursor.execute(insert_query, (
+                    data['user_id'],
+                    data['first_name'],
+                    data['last_name'],
+                    data['full_name'],
+                    birthdate,
+                    data['phone'],
+                    data['user_sul_id'],
+                    data['user_sul_gender'],
+                    data['card_id'],
+                    data['active']
+
+                ))
+                connection.commit()
+
+                log(f"Пользователь с User_id {data['user_id']} успешно зарегистрирован.")
+                data_cache['users'][data['user_id']] = {
+                    'first_name': data['first_name'],
+                    'last_name': data['last_name'],
+                    'full_name': data['full_name'],
+                    'birthdate': data['birthdate'],
+                    'phone': data['phone'],
+                    'user_sul_id': data['user_sul_id'],
+                    'user_sul_gender': data['user_sul_gender'],
+                    'card_id': data['card_id'],
+                    'active': data['active']
+                }
+                print(data_cache)
+        except mysql.connector.Error as err:
+            log(f"Ошибка при выполнении запроса в register_user_db: {err}")
 
         finally:
             connection.close()

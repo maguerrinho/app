@@ -13,7 +13,7 @@ time_cash_user = {}
 def replykeyboardmenu(type_menu):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     if type_menu == 1:  # Кнопка авторизации
-        button = types.KeyboardButton('Поделит ься номером телефона', request_contact=True)
+        button = types.KeyboardButton('Поделиться номером телефона', request_contact=True)
         markup.add(button)
     if type_menu == 2:  # Кнопки выбора бренда
         button_gv = types.KeyboardButton('GoodVape')
@@ -87,7 +87,9 @@ def setup_message_handlers(bot):
                 'frist_name': frist_name,
                 'last_name': last_name,
                 'full_name': full_name,
-                'phone': phone
+                'phone': phone,
+                'user_id': user_id,
+                'active': 1
 
             }
             bot.reply_to(message, read_template('103'), reply_markup=inlinekeyboardmenu(1))
@@ -98,27 +100,46 @@ def setup_message_handlers(bot):
         if call.data == 'noregister':
             if user_id in time_cash_user:
                 del time_cash_user[user_id]
-            bot.answer_callback_query(call.id, read_template('101'))
-            bot.send_message(call.message.chat.id, 'Меню',
-                             reply_markup=replykeyboardmenu(1))  # Редактируем для отправки клавиатуры
+            bot.answer_callback_query(call.id, read_template('101'), reply_markup=replykeyboardmenu(1))
         elif call.data == 'register':
-            bot.answer_callback_query(call.id, read_template('104'))
             user_sul = get_user_sul(time_cash_user[user_id]['phone'])
             if user_sul.get('code') == 0:
                 users = user_sul.get('users', [])
                 for user in users:
                     user_sul_id = user.get('id')
+                    user_sul_gender = user.get('gender')
+                    user_sul_birthdate = user.get('birthdate')  # Приходит в Unix - нужен перевод
+                    time_cash_user[user_id] = {
+                        'user_sul_id': user_sul_id,
+                        'user_sul_gender': user_sul_gender,
+                        'birthdate': user_sul_birthdate
+                    }
                     cards = user.get('cards', [])
                     for card in cards:
                         card_id = card.get('id')
+                        time_cash_user[user_id]['card_id'] = card_id
             elif user_sul.get('code') == 114:
-                pass
+                bot.send_message(call.message.chat.id, "Введите ваш год рождения (например, 1990):")
+                bot.register_next_step_handler_by_chat_id(call.message.chat.id, process_birth_year)
             else:
                 pass
+        elif call.data in ['male', 'female']:
+            if call.data == 'male':
+                time_cash_user[user_id]['gender'] = 'male'
+            else:
+                time_cash_user[user_id]['gender'] = 'female'
+            keyboard = types.InlineKeyboardMarkup()
+            keyboard.add(types.InlineKeyboardButton(text='Зарегестрироваться', callback_data='confirm'),
+                         types.InlineKeyboardButton(text='Хочу изменить', callback_data='want_change'),
+                         types.InlineKeyboardButton(text='Отказаться', callback_data='noregister'))
+            bot.send_message(call.message.chat.id, f"Что бы продолжить регистрацию потвердите ваши данные:\n\n"
+                                                   f"- Имя: {time_cash_user[user_id]['full_name']}\n"
+                                                   f"- Дата рождения: {time_cash_user[user_id]['birthdate']}\n"
+                                                   f"- Пол: {time_cash_user[user_id]['gender']}\n",
+                                                   f"- Телефон: {time_cash_user[user_id]['phone']}\n",
+                             reply_markup=keyboard)
+        elif call.data == 'confirm':
 
-    def request_birth_year(message):
-        bot.reply_to(message, "Введите ваш год рождения (например, 1990):")
-        bot.register_next_step_handler(message, process_birth_year)
 
     def process_birth_year(message):
         user_id = message.from_user.id
@@ -169,8 +190,10 @@ def setup_message_handlers(bot):
                     return
                 time_cash_user[user_id]['day'] = day
                 time_cash_user[user_id]['birthdate'] = birthdate.strftime('%d.%m.%Y')
-                bot.reply_to(message, f"Дата рождения сохранена: {time_cash_user[user_id]['birthdate']}")
-                # Далее можно продолжать выполнение других функций
+                keyboard = types.InlineKeyboardMarkup()
+                keyboard.add(types.InlineKeyboardButton(text='Мужской', callback_data='male'),
+                             types.InlineKeyboardButton(text='Женский', callback_data='female'))
+                bot.reply_to(message, "Выберите ваш пол:", reply_markup=keyboard)
         except ValueError:
             bot.reply_to(message, "Некорректный формат. Пожалуйста, введите день рождения заново (1-31):")
             bot.register_next_step_handler(message, process_birth_day)
@@ -178,15 +201,3 @@ def setup_message_handlers(bot):
             print(f"Произошла ошибка: {e}")  # Логируем ошибку
             bot.reply_to(message, "Произошла ошибка при обработке даты рождения. Пожалуйста, введите данные заново.")
             bot.register_next_step_handler(message, process_birth_year)
-
-    def process_last_name(message):
-        user_id = message.from_user.id
-        last_name = message.text
-        time_cash_user[user_id] = {
-            'name': last_name
-        }
-
-        keyboard = types.InlineKeyboardMarkup()
-        keyboard.add(types.InlineKeyboardButton(text='Мужской', callback_data='male'),
-                     types.InlineKeyboardButton(text='Женский', callback_data='female'))
-        bot.reply_to(message, "Выберите ваш пол:", reply_markup=keyboard)
