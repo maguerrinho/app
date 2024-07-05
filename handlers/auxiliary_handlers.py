@@ -1,3 +1,6 @@
+import re
+
+
 def format_phone(phone):
     if phone is None:
         return ''

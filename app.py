@@ -1,5 +1,6 @@
 from flask import Flask, request
 from telebot import TeleBot, types
+
 from database.db_utils import get_data_db  # Импорт функции для работы с базой данных
 from handlers.message_handlers import setup_message_handlers  # Импорт функции для настройки обработчиков сообщений
 from log.logging import log  # Импорт функции для логирования ошибок
@@ -19,6 +20,7 @@ try:
 
     bot = TeleBot(TOKEN)  # Создаем экземпляр Telegram бота с использованием полученного токена
     setup_message_handlers(bot)  # Вызов функции для настройки обработчиков сообщений
+
 
     @app.route('/webhook', methods=['POST'])
     def webhook():
@@ -42,6 +44,7 @@ try:
             error_message = f"Error processing webhook: {e}"  # Формируем сообщение об ошибке
             log(error_message)  # Логируем ошибку
             return error_message, 400  # Возвращаем HTTP код ошибки
+
 
     if __name__ == '__main__':
         try:

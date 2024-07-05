@@ -1,10 +1,10 @@
-from datetime import datetime
-from database.db_utils import get_data_db
-from log.logging import log
-
 import hashlib
 import json
+
 import requests
+
+from database.db_utils import get_data_db
+from log.logging import log
 
 
 def get_token_sul():
@@ -52,7 +52,7 @@ def get_token_sul():
             return {
                 "token": result.get('token'),
                 "url": db_url,
-                "shop_id": db_shop_id 
+                "shop_id": db_shop_id
             }
 
     except Exception as e:
@@ -109,17 +109,16 @@ def register_in_sul(login, name, phone, gender, birthdate, city_id):
         }
 
         response = requests.post(url, headers=headers, data=json.dumps(data))
-        result = response.json()  
+        result = response.json()
         if result.get('code') != 0:
             response_text = (f"Ошибка в выполнении запроса к 1С-Рарус: Код: {result.get('code')} "
-                            f"Сообщение {result.get('message')}")
+                             f"Сообщение {result.get('message')}")
             log(response_text)
             return None
         return result
     except Exception as e:
         log(f"Произошла ошибка при выполнении запроса: {e}")
         return None
-
 
 # def get_card_sul(phone, view):
 #     try:

@@ -1,27 +1,27 @@
-#-----------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------
 # Используемые публичные функции из этого файла:
 # - update_user_db(user_id, phone=None, name=None, birth_date=None, active=None, id_card=None):
-#     Обновляет данные пользователя в таблице bot_Users.
-#     Параметры:
-#     - user_id: int - идентификатор пользователя.
-#     - phone: str - новый номер телефона пользователя (опционально).
-#     - name: str - новое имя пользователя (опционально).
-#     - birth_date: str - новая дата рождения пользователя в формате 'YYYY-MM-DD' (опционально).
-#     - active: bool - новый статус активности пользователя (опционально).
-#     - id_card: str - новый идентификационный номер пользователя (опционально).
-#     Возвращает: None.
+#   Обновляет данные пользователя в таблице bot_Users.
+#   Параметры:
+#   - user_id: int - идентификатор пользователя.
+#   - phone: str - новый номер телефона пользователя (опционально).
+#   - name: str - новое имя пользователя (опционально).
+#   - birth_date: str - новая дата рождения пользователя в формате 'YYYY-MM-DD' (опционально).
+#   - active: bool - новый статус активности пользователя (опционально).
+#   - id_card: str - новый идентификационный номер пользователя (опционально).
+#   Возвращает: None.
 
 # - get_data_db(data_type, phone=None, user_id=None):
-#     Получает данные из базы данных в зависимости от указанного типа.
-#     Параметры:
-#     - data_type: int - тип данных для запроса:
-#         1 - настройки бота (Token, Url),
-#         2 - настройки Сула (Login, Password, URL),
-#         3 - список администраторов бота (User_id),
-#         4 - информация о пользователе (phone - номер телефона пользователя, user_id - id пользователя).
-#     - phone: str - номер телефона пользователя для запроса типа 4 (опционально).
-#     - user_id: int - id пользователя для запроса типа 4 (опционально).
-#     Возвращает: кортеж или список с данными из базы данных или None в случае ошибки.
+#   Получает данные из базы данных в зависимости от указанного типа.
+#   Параметры:
+#   - data_type: int - тип данных для запроса:
+#       1 - настройки бота (Token, Url),
+#       2 - настройки Сула (Login, Password, URL),
+#       3 - список администраторов бота (User_id),
+#       4 - информация о пользователе (phone - номер телефона пользователя, user_id - id пользователя).
+#   - phone: str - номер телефона пользователя для запроса типа 4 (опционально).
+#   - user_id: int - id пользователя для запроса типа 4 (опционально).
+#   Возвращает: кортеж или список с данными из базы данных или None в случае ошибки.
 
 # Запросы на создание таблиц в базе данных:
 
@@ -52,16 +52,20 @@
 #     Active BOOLEAN DEFAULT FALSE,
 #     id_card VARCHAR(50)
 # );
-#-----------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------
+
+
 import mysql.connector
+
 from log.logging import log
 
 # Кэши для шаблонов сообщений и данных пользователей/администраторов
 template_cache = {}
 data_cache = {
-    'admin_list': None,  # Кэш для списка администраторов
-    'users': {}          # Кэш для данных пользователей по user_id
+    'admin_list': [],  # Инициализация пустым списком
+    'users': {}        # Кэш для данных пользователей по user_id
 }
+
 
 # Функция для установки соединения с базой данных
 def connect_to_db():
@@ -81,6 +85,7 @@ def connect_to_db():
     except mysql.connector.Error as err:
         log(f"Ошибка подключения к базе данных: {err}")
         return None
+
 
 # Функция для выполнения запросов на получение данных из базы данных
 def get_data_db(data_type, phone=None, user_id=None):
@@ -127,7 +132,10 @@ def get_data_db(data_type, phone=None, user_id=None):
                     query = "SELECT User_id FROM Administrators_List"
                     cursor.execute(query)
                     data = cursor.fetchall()
-                    data_cache['admin_list'] = data  # Кэширование списка администраторов
+                    if len(data) > 0:
+                        data_cache['admin_list'] = data  # Кэширование списка администраторов
+                    else:
+                        data_cache['admin_list'] = []  # Или другое значение по умолчанию, если нет данных
                 elif data_type == 4:
                     if phone is not None and user_id is None:
                         query = "SELECT * FROM bot_Users WHERE phone = %s"
@@ -140,7 +148,8 @@ def get_data_db(data_type, phone=None, user_id=None):
                         if data:
                             data_cache['users'][user_id] = data  # Кэширование данных пользователя
                     else:
-                        log("Ошибка при вызове функции get_data_db с параметрами phone или user_id, необходимо указать одно из двух значений.")
+                        log("Ошибка при вызове функции get_data_db с параметрами phone или user_id, "
+                            "необходимо указать одно из двух значений.")
                         return None
                 else:
                     log("Ошибка при вызове функции get_data_db передан некорректный тип данных.")
@@ -158,6 +167,7 @@ def get_data_db(data_type, phone=None, user_id=None):
     else:
         log("Не удалось подключиться к базе данных.")
         return None
+
 
 # Функция для обновления данных пользователя
 def update_user_db(user_id, phone=None, name=None, birth_date=None, active=None, id_card=None):
@@ -222,6 +232,7 @@ def update_user_db(user_id, phone=None, name=None, birth_date=None, active=None,
     else:
         log("Невозможно установить соединение с базой данных.")
 
+
 # Функция для чтения шаблона из базы данных или кэша
 def read_template(template_id):
     """
@@ -247,6 +258,7 @@ def read_template(template_id):
             return None
         finally:
             connection.close()
+
 
 # Функция для обновления шаблона в базе данных и кэше
 def update_template(template_id, template_text):
