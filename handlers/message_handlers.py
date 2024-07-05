@@ -13,7 +13,7 @@ time_cash_user = {}
 def replykeyboardmenu(type_menu):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     if type_menu == 1:  # Кнопка авторизации
-        button = types.KeyboardButton('Поделиться номером телефона', request_contact=True)
+        button = types.KeyboardButton('Поделит ься номером телефона', request_contact=True)
         markup.add(button)
     if type_menu == 2:  # Кнопки выбора бренда
         button_gv = types.KeyboardButton('GoodVape')
