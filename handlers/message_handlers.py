@@ -1,13 +1,22 @@
+import datetime
+import re
+from datetime import datetime
+
 from telebot import types
 
-from auxiliary_handlers import format_phone
 from database.db_utils import get_data_db, update_user_db, read_template
 from integration.bonussystem import get_user_sul
 from log.logging import log
-import datetime
-from datetime import datetime
 
 time_cash_user = {}
+
+
+def format_phone(phone):
+    if phone is None:
+        return ''
+    if isinstance(phone, int):
+        phone = str(phone)
+    return re.sub(r'\D', '', phone)
 
 
 def replykeyboardmenu(type_menu):
@@ -138,8 +147,6 @@ def setup_message_handlers(bot):
                                                    f"- Пол: {time_cash_user[user_id]['gender']}\n",
                                                    f"- Телефон: {time_cash_user[user_id]['phone']}\n",
                              reply_markup=keyboard)
-        elif call.data == 'confirm':
-
 
     def process_birth_year(message):
         user_id = message.from_user.id

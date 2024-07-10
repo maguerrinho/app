@@ -1,62 +1,82 @@
-from flask import Flask, request
-from telebot import TeleBot, types
+import logging  # Импортируем модуль для логирования событий
+import ssl  # Импортируем модуль для работы с SSL (шифрование)
+from aiohttp import web  # Импортируем модуль для создания веб-приложений на asyncio
+import telebot  # Импортируем модуль для работы с Telegram Bot API
+from database.db_utils import get_data_db  # Импортируем функцию для работы с базой данных
+from handlers.message_handlers import setup_message_handlers  # Импортируем функцию для настройки обработчиков сообщений
 
-from database.db_utils import get_data_db  # Импорт функции для работы с базой данных
-from handlers.message_handlers import setup_message_handlers  # Импорт функции для настройки обработчиков сообщений
-from log.logging import log  # Импорт функции для логирования ошибок
+# Порт для вебхука
+WEBHOOK_PORT = 8443
+WEBHOOK_LISTEN = '0.0.0.0'  # Прослушивание всех входящих подключений
 
-app = Flask(__name__)  # Создаем экземпляр Flask приложения
+# Пути к SSL сертификатам
+WEBHOOK_SSL_CERT = "/etc/letsencrypt/live/pischasov.nikita.fvds.ru/fullchain.pem"
+WEBHOOK_SSL_PRIV = "/etc/letsencrypt/live/pischasov.nikita.fvds.ru/privkey.pem"
 
 try:
-    TOKEN, URL = get_data_db(1)  # Получение токена бота и URL вебхука из базы данных
-
-    if not TOKEN:
-        log("Bot token is not defined")  # Логируем ошибку, если токен бота не определен
+    # Получаем токен бота и URL вебхука из базы данных
+    API_TOKEN, WEBHOOK_HOST = get_data_db(1)
+    if not API_TOKEN:
         raise ValueError("Bot token is not defined")  # Вызываем исключение, если токен бота не определен
 
-    if not URL:
-        log("Webhook URL is not defined")  # Логируем ошибку, если URL вебхука не определен
+    if not WEBHOOK_HOST:
         raise ValueError("Webhook URL is not defined")  # Вызываем исключение, если URL вебхука не определен
 
-    bot = TeleBot(TOKEN)  # Создаем экземпляр Telegram бота с использованием полученного токена
-    setup_message_handlers(bot)  # Вызов функции для настройки обработчиков сообщений
+    # URL для вебхука
+    WEBHOOK_URL_BASE = f"https://{WEBHOOK_HOST}:{WEBHOOK_PORT}"
+    WEBHOOK_URL_PATH = f"/{API_TOKEN}/"
 
+    # Настройка логирования для библиотеки telebot
+    logger = telebot.logger
+    telebot.logger.setLevel(logging.INFO)
 
-    @app.route('/webhook', methods=['POST'])
-    def webhook():
-        """
-        Обрабатывает входящие POST запросы на /webhook.
-        
-        Входные данные:
-        - request: объект запроса Flask
-        
-        Возвращает:
-        - str: ответное сообщение или описание ошибки, если она возникла
-        - int: HTTP статус код ответа (200 или 400)
-        """
-        try:
-            json_str = request.get_data().decode('UTF-8')  # Получаем данные POST запроса
-            update = types.Update.de_json(json_str)  # Преобразуем данные в объект Update
-            bot.process_new_updates([update])  # Обрабатываем новые обновления от Telegram
-            return '!', 200  # Возвращаем успешный HTTP код
+    # Создание экземпляра бота
+    bot = telebot.TeleBot(API_TOKEN)
 
-        except Exception as e:
-            error_message = f"Error processing webhook: {e}"  # Формируем сообщение об ошибке
-            log(error_message)  # Логируем ошибку
-            return error_message, 400  # Возвращаем HTTP код ошибки
+    # Создание aiohttp приложения
+    app = web.Application()
 
+    # Обработчик запросов от Telegram
+    async def handle(request):
+        if request.match_info.get('token') == bot.token:
+            request_body_dict = await request.json()
+            print("Received request:", request_body_dict)  # Отладочная информация
+            update = telebot.types.Update.de_json(request_body_dict)
+            bot.process_new_updates([update])
+            return web.Response()
+        else:
+            return web.Response(status=403)
 
-    if __name__ == '__main__':
-        try:
-            bot.remove_webhook()  # Удаляем предыдущий вебхук (если есть)
-            bot.set_webhook(url=URL)  # Устанавливаем новый вебхук с использованием URL
-            app.run(host='127.0.0.1', port=8443)  # Запускаем Flask приложение
+    # Добавление маршрута для обработки запросов вебхука
+    app.router.add_post('/{token}/', handle)
 
-        except Exception as e:
-            log(f"An error occurred: {e}")  # Логируем ошибку запуска приложения
+    # Вызов функции для настройки обработчиков сообщений
+    setup_message_handlers(bot)
 
-except ValueError as ve:
-    log(f"ValueError: {ve}")  # Логируем исключение ValueError
+    # Удаление предыдущего вебхука (если был установлен)
+    bot.remove_webhook()
+
+    # Установка нового вебхука
+    try:
+        response = bot.set_webhook(url=WEBHOOK_URL_BASE + WEBHOOK_URL_PATH)
+        if response:
+            print("Webhook set successfully")
+        else:
+            print("Webhook set failed")
+    except Exception as e:
+        print(f"Error setting webhook: {e}")
+
+    # Создание SSL контекста
+    context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+    context.load_cert_chain(WEBHOOK_SSL_CERT, WEBHOOK_SSL_PRIV)
+
+    # Запуск aiohttp сервера
+    web.run_app(
+        app,
+        host=WEBHOOK_LISTEN,
+        port=WEBHOOK_PORT,
+        ssl_context=context,
+    )
 
 except Exception as e:
-    log(f"An unexpected error occurred: {e}")  # Логируем неожиданное исключение
+    print(f"An error occurred: {e}")
